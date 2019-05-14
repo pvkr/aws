@@ -1,0 +1,104 @@
+aws ec2 describe-instances
+
+rem -----------------------------------------hw1--------------------------------------------
+rem add security group
+aws ec2 create-security-group --group-name my-sg --description "My security group"
+
+rem obtain cidr
+curl https://checkip.amazonaws.com
+
+rem add ssh access
+aws ec2 authorize-security-group-ingress --group-id sg-08b58ed071629891a --protocol tcp --port 22 --cidr 85.223.232.0/24
+
+rem run instance
+aws ec2 run-instances --image-id ami-09def150731bdbcc2 --count 1 --instance-type t2.micro --key-name aws-pvk-key-1 --security-group-ids sg-08b58ed071629891a --subnet-id subnet-a9fa08c3
+
+rem obtain instance Id
+aws ec2 describe-instances --filters "Name=instance-type,Values=t2.micro" --query "Reservations[].Instances[].InstanceId"
+rem obtain ip address
+aws ec2 describe-instances --filters "Name=instance-type,Values=t2.micro" --query "Reservations[].Instances[].PublicIpAddress"
+
+rem add tag
+rem aws ec2 create-tags --resources <instance-id> --tags Key=Name,Value=APP-01
+
+rem connect
+ssh -i 'C:\Users\Pavel_Kryshtop\.ssh\aws-pvk-key-1.pem' ec2-user@54.93.129.247
+ssh -i 'C:\Users\Pavel\.ssh\aws-pvk-key-1.pem' ec2-user@52.59.237.182
+
+rem terminate
+aws ec2 terminate-instances --instance-ids i-057f1867c09e4e6fe
+
+rem -----------------------------------------hw2--------------------------------------------
+
+aws ec2 create-vpc --cidr-block 10.10.0.0/16
+
+aws ec2 create-subnet --vpc-id vpc-00e7da174ba8b7846 --cidr-block 10.10.0.0/24 --availability-zone eu-central-1a
+aws ec2 create-subnet --vpc-id vpc-00e7da174ba8b7846 --cidr-block 10.10.1.0/24 --availability-zone eu-central-1a
+aws ec2 create-subnet --vpc-id vpc-00e7da174ba8b7846 --cidr-block 10.10.2.0/24 --availability-zone eu-central-1b
+aws ec2 create-subnet --vpc-id vpc-00e7da174ba8b7846 --cidr-block 10.10.3.0/24 --availability-zone eu-central-1b
+aws ec2 create-subnet --vpc-id vpc-00e7da174ba8b7846 --cidr-block 10.10.4.0/24 --availability-zone eu-central-1c
+aws ec2 create-subnet --vpc-id vpc-00e7da174ba8b7846 --cidr-block 10.10.5.0/24 --availability-zone eu-central-1c
+
+aws ec2 create-tags --resources <> --tags Key=Name,Value=public-eu-central-1a
+aws ec2 create-tags --resources <> --tags Key=Name,Value=private-eu-central-1a
+aws ec2 create-tags --resources <> --tags Key=Name,Value=public-eu-central-1b
+aws ec2 create-tags --resources <> --tags Key=Name,Value=private-eu-central-1b
+aws ec2 create-tags --resources subnet-03b4e6e0e2ecd26d9 --tags Key=Name,Value=public-eu-central-1c
+aws ec2 create-tags --resources subnet-063bb041f6effd35b --tags Key=Name,Value=private-eu-central-1c
+
+aws ec2 create-internet-gateway
+aws ec2 create-tags --resources igw-0c99aa03d2ecd62c7 --tags Key=Name,Value=demo-igw
+aws ec2 attach-internet-gateway --vpc-id vpc-00e7da174ba8b7846 --internet-gateway-id igw-0c99aa03d2ecd62c7 --region eu-central-1
+
+
+aws ec2 create-route-table --vpc-id vpc-00e7da174ba8b7846
+aws ec2 create-tags --resources rtb-06fc7e737758adaa9 --tags Key=Name,Value=demo-custom-rt
+aws ec2 create-route --route-table-id rtb-06fc7e737758adaa9 --destination-cidr-block 0.0.0.0/0 --gateway-id igw-0c99aa03d2ecd62c7
+
+aws ec2 associate-route-table --route-table-id rtb-06fc7e737758adaa9 --subnet-id subnet-008ded6a5be396af8
+aws ec2 associate-route-table --route-table-id rtb-06fc7e737758adaa9 --subnet-id subnet-0a2ed6d9a3b326f1b
+aws ec2 associate-route-table --route-table-id rtb-06fc7e737758adaa9 --subnet-id subnet-03b4e6e0e2ecd26d9
+
+# test 
+aws ec2 create-security-group --group-name demo-sg --description "Demo security group" --vpc-id vpc-00e7da174ba8b7846
+aws ec2 authorize-security-group-ingress --group-id sg-068e3c2ea0786b8ee --protocol tcp --port 22 --cidr 85.223.232.0/24
+
+aws ec2 run-instances --image-id ami-09def150731bdbcc2 --count 1 --instance-type t2.micro --key-name aws-pvk-key-1 --security-group-ids sg-068e3c2ea0786b8ee --subnet-id subnet-008ded6a5be396af8 --associate-public-ip-address
+aws ec2 create-tags --resources i-09af3e07731455c60 --tags Key=Name,Value=PUB-APP-1A
+#aws ec2 run-instances --image-id ami-09def150731bdbcc2 --count 1 --instance-type t2.micro --key-name aws-pvk-key-1 --security-group-ids sg-068e3c2ea0786b8ee --subnet-id subnet-00a898b1511d16aff --associate-public-ip-address
+aws ec2 run-instances --image-id ami-09def150731bdbcc2 --count 1 --instance-type t2.micro --key-name aws-pvk-key-1 --security-group-ids sg-068e3c2ea0786b8ee --subnet-id subnet-00a898b1511d16aff
+aws ec2 create-tags --resources i-0536475936981427f --tags Key=Name,Value=PRV-APP-1A
+
+rem ----------------------------------------------hw2-------------------------------------------
+
+aws s3api create-bucket --bucket nginx-config-pvkr-demo --region eu-central-1 --create-bucket-configuration LocationConstraint=eu-central-1
+aws s3api put-bucket-tagging --bucket nginx-config-pvkr-demo --tagging TagSet=[{Key=type,Value=nginx}]
+aws s3api put-bucket-versioning --bucket nginx-config-pvkr-demo --versioning-configuration Status=Enabled
+aws s3 cp index.html s3://nginx-config-pvkr-demo
+#aws s3 presign s3://nginx-config-pvkr-demo/index.html --expires-in 300
+                                                                                                                                                     
+aws s3api create-bucket --bucket front-logs-pvkr-demo --region eu-central-1 --create-bucket-configuration LocationConstraint=eu-central-1
+aws s3api put-bucket-tagging --bucket front-logs-pvkr-demo --tagging TagSet=[{Key=type,Value=front}]
+
+#aws s3 presign s3://test-bucket/test-file.txt --expires-in 600 
+
+#rem create roles mamually:(
+
+#Launch configuration/ User data
+#!/bin/bash
+yum update -y
+mkdir -p /opt/nginx
+aws s3 sync /usr/share/nginx/html s3://nginx-config-pvkr-demo/nginx/
+touch `curl http://169.254.169.254/latest/meta-data/local-ipv4`
+aws s3 cp `curl http://169.254.169.254/latest/meta-data/local-ipv4` s3://front-logs-pvkr-demo/logs/
+yum install -y docker
+usermod -aG docker ec2-user
+docker run --name nginx -d -p 80:80 -v /opt/nginx:/usr/share/nginx/html:ro nginx
+
+yum install -y nginx
+service nginx start
+
+
+amazon-linux-extras install docker
+service docker start
+usermod -a -G docker ec2-user
