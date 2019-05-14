@@ -2,7 +2,6 @@ package com.github.pvkr.aws.lambda;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
@@ -12,6 +11,8 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -32,11 +33,10 @@ public class GetTimeLambda implements RequestHandler<Object, Object> {
         try {
             HttpResponse response = httpClient.execute(new HttpGet("http://worldclockapi.com/api/json/est/now"));
             if ((response.getStatusLine().getStatusCode() / 100) == 2) {
-                HttpEntity entity = response.getEntity();
-                InputStream content = response.getEntity().getContent();
+                byte[] content = getContentBytes(response.getEntity().getContent());
 
                 s3.putObject(PutObjectRequest.builder().bucket(bucket).key(key).build(),
-                        RequestBody.fromContentProvider(() -> content, entity.getContentLength(), "application/json")
+                        RequestBody.fromContentProvider(() -> new ByteArrayInputStream(content), content.length, "application/json")
                 );
                 context.getLogger().log("Put time to s3");
             }
@@ -45,5 +45,16 @@ public class GetTimeLambda implements RequestHandler<Object, Object> {
         }
 
         return null;
+    }
+
+    private byte[] getContentBytes(InputStream content) throws IOException {
+        byte[] buffer = new byte[1024];
+        int len;
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        while ((len = content.read(buffer)) != -1) {
+            baos.write(buffer, 0, len);
+        }
+
+        return baos.toByteArray();
     }
 }

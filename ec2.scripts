@@ -102,3 +102,9 @@ service nginx start
 amazon-linux-extras install docker
 service docker start
 usermod -a -G docker ec2-user
+
+
+---hw3----
+aws s3api create-bucket --bucket time-log-pvkr-demo --region eu-central-1 --create-bucket-configuration LocationConstraint=eu-central-1
+aws s3api put-bucket-tagging --bucket time-log-pvkr-demo --tagging TagSet=[{Key=type,Value=lambda}]
+aws s3api put-bucket-versioning --bucket time-log-pvkr-demo --versioning-configuration Status=Enabled
